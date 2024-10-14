@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Days Counter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
+            align-items: center; /* Center items horizontally */
+            background-color: #f0f8ff; /* Light background color */
+        }
+        h1 {
+            color: #2c3e50; /* Dark blue color for the title */
+        }
+        .calendar {
+            margin-bottom: 20px;
+            border: 2px solid #3498db; /* Blue border */
+            padding: 15px;
+            border-radius: 10px; /* Rounded corners */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+        }
+        .month {
+            border: 1px solid #d73333;
+            padding: 10px;
+            width: 300px;
+            height: auto; /* Allow height to adjust based on content */
+            margin: auto;
+            overflow-y: auto;
+        }
+        .month h2 {
+            text-align: center;
+            color: #2980b9; /* Lighter blue for month title */
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background-color: #84a930; /* Green header */
+            text-align: center;
+            padding: 5px;
+        }
+        td {
+            text-align: center;
+            padding: 5px;
+            cursor: pointer;
+            border-radius: 5px;
+            height: 20px; 
+            width: 20px; 
+        }
+        .checked { background-color: lightgreen; }
+        .unchecked { background-color: lightcoral; }
+        .neutral { background-color: lightgray; }
+        .disabled { background-color: #e0e0e0; cursor: not-allowed; }
+        .nav-buttons {
+            text-align: center;
+            margin-top: 10px;
+        }
+        .streak-container {
+            margin-left: 20px; 
+            padding: 10px;
+            border: 1px solid #ccc;
+            width: 200px; 
+        }
+
+        /* Status line styles */
+        .status-line {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #8e44ad; /* Purple color for the status line */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3); /* Subtle shadow for depth */
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Days Counter</h1>
+    <div class="calendar">
+        <div class="month" id="month-container">
+            <h2 id="month-name"></h2>
+            <table id="days-container">
+                <thead>
+                    <tr>
+                        <th>Sun</th>
+                        <th>Mon</th>
+                        <th>Tue</th>
+                        <th>Wed</th>
+                        <th>Thu</th>
+                        <th>Fri</th>
+                        <th>Sat</th>
+                    </tr>
+                </thead>
+                <tbody id="calendar-body"></tbody>
+            </table>
+        </div>
+        <div class="nav-buttons">
+            <button id="prev-month">Previous Month</button>
+            <button id="next-month">Next Month</button>
+        </div>
+    </div>
+
+   <!-- Streak Container -->
+   <div class="streak-container" id="streak-container">
+       <h3>Streak Information</h3>
+       <p><strong>Current Streak:</strong> <span id="current-streak">0</span></p>
+       <p><strong>Longest Checked Streak:</strong> <span id="longest-checked-streak">0</span></p>
+       <p><strong>Longest Unchecked Streak:</strong> <span id="longest-unchecked-streak">0</span></p>
+   </div>
+
+   <!-- Status Line -->
+   <div class="status-line">
+       This application is designed by Gowtham Kaidyam
+   </div>
+
+   <script>
+       let currentMonth = new Date().getMonth() + 1; // Months are zero-indexed
+       let currentYear = new Date().getFullYear();
+       
+       // Get today's date
+       const today = new Date();
+       
+       function toggleDay(day) {
+           const key = `${currentMonth}-${day}`;
+           
+           fetch('/toggle_day', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ day, month: currentMonth })
+           })
+           .then(response => response.json())
+           .then(data => {
+               renderDays();
+               getStreaks(); // Call to get updated streak information from server
+           });
+           
+       }
+
+       function renderDays() {
+           fetch('/get_month', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ month: currentMonth, year: currentYear })
+           })
+           .then(response => response.json())
+           .then(data => {
+               document.getElementById('month-name').textContent = `${data.month_name} ${data.year}`;
+               
+               const calendarBody = document.getElementById('calendar-body');
+               calendarBody.innerHTML = '';
+
+               const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1).getDay(); // Get first day of month (0=Sun)
+               const totalDaysInMonth = new Date(currentYear, currentMonth, 0).getDate(); // Total days in this month
+
+               let row = document.createElement('tr');
+               for (let i = 0; i < firstDayOfMonth; i++) {
+                   const emptyCell = document.createElement('td');
+                   row.appendChild(emptyCell);
+               }
+
+               for (let day = 1; day <= totalDaysInMonth; day++) {
+                   const dayDiv = document.createElement('td');
+                   dayDiv.textContent = day;
+
+                   const key = `${currentMonth}-${day}`;
+                   if (key in data.checked_days) {
+                       if (data.checked_days[key] === "checked") {
+                           dayDiv.classList.add('checked');
+                       } else if (data.checked_days[key] === "unchecked") {
+                           dayDiv.classList.add('unchecked');
+                       } else {
+                           dayDiv.classList.add('neutral');
+                       }
+                   } else {
+                       dayDiv.classList.add('neutral'); // Default state is neutral
+                   }
+
+                   const dateToCheck = new Date(currentYear, currentMonth - 1, day);
+                   if (dateToCheck > today) {
+                       dayDiv.classList.add('disabled'); // Add disabled class
+                       dayDiv.onclick = null; // Prevent click event
+                   } else {
+                       dayDiv.onclick = () => handleToggle(dayDiv, key);
+                   }
+
+                   row.appendChild(dayDiv);
+
+                   if ((day + firstDayOfMonth) % 7 === 0) {
+                       calendarBody.appendChild(row);
+                       row = document.createElement('tr'); // Create a new row for next week
+                   }
+               }
+
+               if (row.children.length > 0) {
+                   while (row.children.length < 7) { // Fill remaining cells with empty cells
+                       const emptyCell = document.createElement('td');
+                       row.appendChild(emptyCell);
+                   }
+                   calendarBody.appendChild(row);
+               }
+
+               getStreaks();
+           });
+       }
+
+       function handleToggle(dayDiv, key) {
+           if (dayDiv.classList.contains('neutral')) {
+               dayDiv.classList.remove('neutral');
+               dayDiv.classList.add('checked');
+               
+               fetch('/toggle_day', { 
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({ day: parseInt(key.split('-')[1]), month: currentMonth, state:"checked" })
+               });
+               
+           } else if (dayDiv.classList.contains('checked')) {
+               dayDiv.classList.remove('checked');
+               dayDiv.classList.add('unchecked');
+
+               fetch('/toggle_day', { 
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({ day: parseInt(key.split('-')[1]), month: currentMonth, state:"unchecked" })
+               });
+               
+           } else if (dayDiv.classList.contains('unchecked')) {
+               dayDiv.classList.remove('unchecked');
+               dayDiv.classList.add('neutral');
+
+                fetch('/toggle_day', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ day: parseInt(key.split('-')[1]), month: currentMonth, state:"neutral" })
+                });
+             }
+         }
+
+         function getStreaks() {
+             fetch('/get_streaks', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({ month: currentMonth, year: currentYear })
+             })
+             .then(response => response.json())
+             .then(data => {
+                 document.getElementById('current-streak').textContent = data.current_streak;
+                 document.getElementById('longest-checked-streak').textContent = data.longest_checked_streak;
+                 document.getElementById('longest-unchecked-streak').textContent = data.longest_unchecked_streak;
+             });
+         }
+
+         document.getElementById('prev-month').onclick=()=>{ 
+             if(currentMonth===1){
+                 currentMonth=12;
+                 currentYear--;
+             }else{
+                 currentMonth--;
+             }
+             renderDays();
+         };
+
+         document.getElementById('next-month').onclick=()=>{ 
+             if(currentMonth===12){
+                 currentMonth=1;
+                 currentYear++;
+             }else{
+                 currentMonth++;
+             }
+             renderDays();
+         };
+
+         renderDays();
+     </script>
+</body>
+</html>
