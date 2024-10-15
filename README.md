@@ -38,6 +38,6 @@ docker pull gowtham454/days_checker:v1.0
 
 # then run it 
 
-docker run -d --name=days_app -p 81:5000 gowtham454/days_checker:v1.0.
+docker run -d --name=days_app -p 81:5000 gowtham454/days_checker:v1.0 
 
 # Thank you.
